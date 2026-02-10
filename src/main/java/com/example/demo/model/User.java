@@ -1,57 +1,48 @@
 package com.example.demo.model;
 
+import com.example.demo.controller.dto.LoginRequest;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.Set;
+import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(name = "tb_users")
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "user_id")
+    private UUID userId;
 
-    @Column(nullable = false, length = 100)
-    private String name;
+    @Column(unique = true)
+    private String username;
 
-    @Column(nullable = false, unique = true, length = 150)
-    private String email;
-
-    @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false)
-    private Boolean active = true;
+    @ManyToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "tb_users_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    public User() {
-        this.createdAt = LocalDateTime.now();
+    public UUID getUserId() {
+        return userId;
     }
 
-    public Long getId() {
-        return id;
+    public void setUserId(UUID userId) {
+        this.userId = userId;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public String getUsername() {
+        return username;
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public String getPassword() {
@@ -62,19 +53,17 @@ public class User {
         this.password = password;
     }
 
-    public Boolean getActive() {
-        return active;
+    public Set<Role> getRoles() {
+        return roles;
     }
 
-    public void setActive(Boolean active) {
-        this.active = active;
+    public void setRoles(Set<Role> roles) {
+        this.roles = roles;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public boolean isLoginCorrect(LoginRequest loginRequest, PasswordEncoder passwordEncoder) {
+        passwordEncoder.matches(loginRequest.password(), this.password);
+        return false;
     }
 }
