@@ -1,11 +1,10 @@
 package com.example.demo.controller;
 
-import com.example.demo.config.ProjectAuthorization;
 import com.example.demo.controller.dto.CreateProjectDto;
 import com.example.demo.controller.dto.ProjectRequestResponseDto;
 import com.example.demo.controller.dto.ProjectResponseDto;
-import com.example.demo.model.*;
-import com.example.demo.repository.ProjectMemberRepository;
+import com.example.demo.model.Project;
+import com.example.demo.model.ProjectRequest;
 import com.example.demo.repository.ProjectRepository;
 import com.example.demo.repository.ProjectRequestRepository;
 import com.example.demo.repository.UserRepository;
@@ -19,29 +18,22 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/projects")
 public class ProjectController {
 
     private final ProjectRepository projectRepository;
     private final ProjectRequestRepository requestRepository;
     private final UserRepository userRepository;
-    private final ProjectMemberRepository projectMemberRepository;
-    private final ProjectAuthorization authorization;
 
     public ProjectController(ProjectRepository projectRepository,
                              ProjectRequestRepository requestRepository,
-                             UserRepository userRepository,
-                             ProjectMemberRepository projectMemberRepository,
-                             ProjectAuthorization authorization) {
+                             UserRepository userRepository) {
 
         this.projectRepository = projectRepository;
         this.requestRepository = requestRepository;
         this.userRepository = userRepository;
-        this.projectMemberRepository = projectMemberRepository;
-        this.authorization = authorization;
     }
 
-    @PostMapping
+    @PostMapping("/project")
     public ResponseEntity<Void> createProject(
             @RequestBody CreateProjectDto dto,
             JwtAuthenticationToken token){
@@ -56,17 +48,10 @@ public class ProjectController {
 
         projectRepository.save(project);
 
-        var membership = new ProjectMember();
-        membership.setProject(project);
-        membership.setUser(user);
-        membership.setRole(ProjectRole.OWNER);
-
-        projectMemberRepository.save(membership);
-
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping
+    @GetMapping("/project")
     public ResponseEntity<List<ProjectResponseDto>> listProjects() {
 
         var projects = projectRepository.findAll();
@@ -84,34 +69,20 @@ public class ProjectController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{projectId}")
-    public ResponseEntity<Void> deleteProject(
-            @PathVariable UUID projectId,
-            JwtAuthenticationToken token){
-
-        var project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-
-        var userId = UUID.fromString(token.getName());
-
-        authorization.requireRole(projectId, userId, ProjectRole.OWNER);
-
-        projectRepository.delete(project);
-
-        return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/{projectId}/requests")
+    @GetMapping("/project/{projectId}/requests")
     public ResponseEntity<List<ProjectRequestResponseDto>> listProjectRequests(
             @PathVariable UUID projectId,
             JwtAuthenticationToken token) {
 
-        var userId = UUID.fromString(token.getName());
+        var user = userRepository.findById(UUID.fromString(token.getName()))
+                .orElseThrow();
 
         var project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        authorization.requireAtLeast(projectId, userId, ProjectRole.MANAGER);
+        if (!project.getOwner().equals(user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
 
         var response = project.getRequests().stream()
                 .map(request -> new ProjectRequestResponseDto(
@@ -125,57 +96,85 @@ public class ProjectController {
         return ResponseEntity.ok(response);
     }
 
-    private void updateRequestStatus(UUID requestId, UUID actorId, boolean accept) {
 
-        var actor = userRepository.findById(actorId).orElseThrow();
+    @DeleteMapping("/project/{id}")
+    public ResponseEntity<Void> deleteProject(
+            @PathVariable UUID id,
+            JwtAuthenticationToken token){
 
-        var request = requestRepository.findById(requestId).orElseThrow();
+        var project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        var project = request.getProject();
+        var userId = UUID.fromString(token.getName());
 
-        authorization.requireAtLeast(project.getProjectId(), actorId, ProjectRole.MANAGER);
-
-        if (accept) {
-
-            project.acceptRequest(request, actor);
-
-            var member = new ProjectMember();
-            member.setProject(project);
-            member.setUser(request.getUser());
-            member.setRole(ProjectRole.MEMBER);
-
-            projectMemberRepository.save(member);
-
-        } else {
-
-            project.rejectRequest(request, actor);
-
+        if (!project.getOwner().getUserId().equals(userId)){
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        projectRepository.save(project);
+        projectRepository.delete(project);
+
+        return ResponseEntity.ok().build();
     }
 
-    @PatchMapping("/requests/{requestId}/accept")
+    @PostMapping("/project/{id}/request")
+    public ResponseEntity<Void> sendJoinRequest(
+            @PathVariable UUID id,
+            JwtAuthenticationToken token) {
+
+        var actor = userRepository.findById(UUID.fromString(token.getName()))
+                .orElseThrow();
+
+        var project = projectRepository.findById(id)
+                .orElseThrow();
+
+        project.sendJoinRequest(actor);
+
+        projectRepository.save(project);
+
+        return ResponseEntity.ok().build();
+    }
+
+
+    @PutMapping("/project/request/{requestId}/accept")
     public ResponseEntity<Void> acceptRequest(
             @PathVariable UUID requestId,
             JwtAuthenticationToken token) {
 
-        var userId = UUID.fromString(token.getName());
+        var user = userRepository.findById(UUID.fromString(token.getName()))
+                .orElseThrow();
 
-        updateRequestStatus(requestId, userId, true);
+        var request = requestRepository.findById(requestId)
+                .orElseThrow();
+
+        var project = request.getProject();
+
+        project.acceptRequest(request, user);
+
+        projectRepository.save(project);
 
         return ResponseEntity.ok().build();
     }
 
-    @PatchMapping("/requests/{requestId}/reject")
+
+    @PutMapping("/project/request/{requestId}/reject")
     public ResponseEntity<Void> rejectRequest(
             @PathVariable UUID requestId,
             JwtAuthenticationToken token) {
 
-        var userId = UUID.fromString(token.getName());
+        var user = userRepository.findById(UUID.fromString(token.getName()))
+                .orElseThrow();
 
-        updateRequestStatus(requestId, userId, false);
+        var request = requestRepository.findById(requestId)
+                .orElseThrow();
+
+        var project = request.getProject();
+
+        project.rejectRequest(request, user);
+
+        projectRepository.save(project);
 
         return ResponseEntity.ok().build();
     }
+
+
 }
