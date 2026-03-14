@@ -106,4 +106,6 @@ public class Project {
         }
         request.reject();
     }
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL)
+    private List<ProjectMember> members = new ArrayList<>();
 }
