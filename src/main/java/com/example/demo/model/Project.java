@@ -26,86 +26,53 @@ public class Project {
     private User owner;
 
     @CreationTimestamp
-    private Instant creationTimeStamp;
+    private Instant creationTimestamp;
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProjectRequest> requests = new ArrayList<>();
 
-    public UUID getProjectId() {
-        return projectId;
-    }
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL)
+    private List<ProjectMember> members = new ArrayList<>();
 
-    public String getNome() {
-        return nome;
-    }
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Post> posts = new ArrayList<>();
 
-    public void setNome(String nome) {
-        this.nome = nome;
-    }
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ChatMessage> messages = new ArrayList<>();
 
-    public String getDescricao() {
-        return descricao;
-    }
+    public UUID getProjectId() { return projectId; }
 
-    public void setDescricao(String descricao) {
-        this.descricao = descricao;
-    }
+    public String getNome() { return nome; }
+    public void setNome(String nome) { this.nome = nome; }
 
-    public User getOwner() {
-        return owner;
-    }
+    public String getDescricao() { return descricao; }
+    public void setDescricao(String descricao) { this.descricao = descricao; }
 
-    public void setOwner(User owner) {
-        this.owner = owner;
-    }
+    public User getOwner() { return owner; }
+    public void setOwner(User owner) { this.owner = owner; }
 
-    public Instant getCreationTimeStamp() {
-        return creationTimeStamp;
-    }
+    public Instant getCreationTimestamp() { return creationTimestamp; }
 
-    public List<ProjectRequest> getRequests() {
-        return requests;
-    }
+    public List<ProjectRequest> getRequests() { return requests; }
+    public List<ProjectMember> getMembers() { return members; }
+    public List<Post> getPosts() { return posts; }
+    public List<ChatMessage> getMessages() { return messages; }
 
-    //SEND A REQUEST FOR ANOTHER OWNER'S PROJECT
     public void sendJoinRequest(User actor) {
         if (this.owner.equals(actor)) {
             throw new IllegalStateException("Owner cannot request own project");
         }
 
         boolean alreadyRequested = requests.stream()
-                .anyMatch(r ->
-                        r.getUser().equals(actor) &&
-                                r.getStatus() == ProjectRequestStatus.PENDING
-                );
+                .anyMatch(r -> r.getUser().equals(actor) && r.getStatus() == ProjectRequestStatus.PENDING);
 
         if (alreadyRequested) {
             throw new IllegalStateException("User already has a pending request");
         }
 
-        requests.add(new ProjectRequest(actor, this));
+        requests.add(new ProjectRequest(actor, this, ProjectRequestType.JOIN_REQUEST));
     }
 
-
-
-    public void addRequest(ProjectRequest request) {
-        request.setProject(this);
-        requests.add(request);
-    }
-
-    public void acceptRequest(ProjectRequest request, User actor) {
-        if (!this.owner.equals(actor)) {
-            throw new SecurityException("Only the project owner can accept requests");
-        }
-        request.accept();
-    }
-
-    public void rejectRequest(ProjectRequest request, User actor) {
-        if (!this.owner.equals(actor)) {
-            throw new SecurityException("Only the project owner can reject requests");
-        }
-        request.reject();
-    }
-    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL)
-    private List<ProjectMember> members = new ArrayList<>();
+    public void acceptRequest(ProjectRequest request) { request.accept(); }
+    public void rejectRequest(ProjectRequest request) { request.reject(); }
 }

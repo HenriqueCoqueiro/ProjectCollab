@@ -1,6 +1,7 @@
 package com.example.demo.model;
 
 import jakarta.persistence.*;
+
 import java.util.UUID;
 
 @Entity
@@ -10,7 +11,6 @@ import java.util.UUID;
                 @UniqueConstraint(columnNames = {"project_id", "user_id"})
         }
 )
-
 public class ProjectMember {
 
     @Id
@@ -29,43 +29,14 @@ public class ProjectMember {
     @Column(nullable = false)
     private ProjectRole role;
 
-    private boolean active = true;
+    public UUID getId() { return id; }
 
-    public UUID getId() {
-        return id;
-    }
+    public Project getProject() { return project; }
+    public void setProject(Project project) { this.project = project; }
 
-    public Project getProject() {
-        return project;
-    }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public void setProject(Project project) {
-        this.project = project;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public ProjectRole getRole() {
-        return role;
-    }
-
-    public void setRole(ProjectRole role) {
-        this.role = role;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
-    }
-
-
+    public ProjectRole getRole() { return role; }
+    public void setRole(ProjectRole role) { this.role = role; }
 }

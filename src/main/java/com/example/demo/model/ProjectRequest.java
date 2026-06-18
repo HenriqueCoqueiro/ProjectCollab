@@ -24,60 +24,57 @@ public class ProjectRequest {
     @Column(nullable = false)
     private ProjectRequestStatus status;
 
-    protected ProjectRequest() {
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ProjectRequestType type;
 
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true)
+    private ProjectRole invitedRole;
 
-    public ProjectRequest(User user, Project project) {
+    protected ProjectRequest() {}
+
+    public ProjectRequest(User user, Project project, ProjectRequestType type) {
         this.user = user;
         this.project = project;
-        this.status = ProjectRequestStatus.PENDING; // Every project request must be created as pending
+        this.status = ProjectRequestStatus.PENDING;
+        this.type = type;
+        this.invitedRole = null;
     }
 
-
-    public void markPending() {
+    public ProjectRequest(User user, Project project, ProjectRole invitedRole) {
+        this.user = user;
+        this.project = project;
         this.status = ProjectRequestStatus.PENDING;
+        this.type = ProjectRequestType.INVITE;
+        this.invitedRole = invitedRole;
     }
 
     public void accept() {
         if (this.status != ProjectRequestStatus.PENDING) {
-            throw new IllegalStateException(
-                    "Only PENDING requests can be accepted"
-            );
+            throw new IllegalStateException("Only PENDING requests can be accepted");
         }
         this.status = ProjectRequestStatus.ACCEPTED;
     }
 
     public void reject() {
         if (this.status != ProjectRequestStatus.PENDING) {
-            throw new IllegalStateException(
-                    "Only PENDING requests can be rejected"
-            );
+            throw new IllegalStateException("Only PENDING requests can be rejected");
         }
         this.status = ProjectRequestStatus.REJECTED;
     }
 
-    public UUID getRequestId() {
-        return requestId;
-    }
+    public UUID getRequestId() { return requestId; }
 
-    public User getUser() {
-        return user;
-    }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public Project getProject() {
-        return project;
-    }
+    public Project getProject() { return project; }
+    public void setProject(Project project) { this.project = project; }
 
-    public ProjectRequestStatus getStatus() {
-        return status;
-    }
+    public ProjectRequestStatus getStatus() { return status; }
 
-    public void setUser(User user) {
-        this.user = user;
-    }
+    public ProjectRequestType getType() { return type; }
 
-    public void setProject(Project project) {
-        this.project = project;
-    }
+    public ProjectRole getInvitedRole() { return invitedRole; }
 }

@@ -7,18 +7,18 @@ import jakarta.persistence.*;
 public class Role {
 
     @Id
-    @GeneratedValue(strategy =  GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "role_id")
-    private long id_roleId;
+    private long roleId;
 
     private String name;
 
-    public long getId_roleId() {
-        return id_roleId;
+    public long getRoleId() {
+        return roleId;
     }
 
-    public void setId_roleId(long id_roleId) {
-        this.id_roleId = id_roleId;
+    public void setRoleId(long roleId) {
+        this.roleId = roleId;
     }
 
     public String getName() {
@@ -30,11 +30,12 @@ public class Role {
     }
 
     public enum Values {
-
         ADMIN(1L),
         BASIC(2L);
-        long roleId;
-        Values(long roleId){
+
+        final long roleId;
+
+        Values(long roleId) {
             this.roleId = roleId;
         }
 

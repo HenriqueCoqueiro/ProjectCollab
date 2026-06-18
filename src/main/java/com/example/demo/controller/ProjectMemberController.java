@@ -1,19 +1,14 @@
 package com.example.demo.controller;
 
 import com.example.demo.config.ProjectAuthorization;
-import com.example.demo.controller.dto.ProjectInviteDto;
-import com.example.demo.controller.dto.ProjectMemberResponseDto;
-import com.example.demo.controller.dto.UpdateMemberRoleDto;
-import com.example.demo.model.ProjectMember;
-import com.example.demo.model.ProjectRequest;
-import com.example.demo.model.ProjectRole;
-import com.example.demo.repository.ProjectMemberRepository;
-import com.example.demo.repository.ProjectRepository;
-import com.example.demo.repository.ProjectRequestRepository;
-import com.example.demo.repository.UserRepository;
+import com.example.demo.controller.dto.*;
+import com.example.demo.model.*;
+import com.example.demo.repository.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -28,13 +23,11 @@ public class ProjectMemberController {
     private final UserRepository userRepository;
     private final ProjectAuthorization authorization;
 
-    public ProjectMemberController(
-            ProjectMemberRepository projectMemberRepository,
-            ProjectRequestRepository requestRepository,
-            ProjectRepository projectRepository,
-            UserRepository userRepository,
-            ProjectAuthorization authorization
-    ) {
+    public ProjectMemberController(ProjectMemberRepository projectMemberRepository,
+                                   ProjectRequestRepository requestRepository,
+                                   ProjectRepository projectRepository,
+                                   UserRepository userRepository,
+                                   ProjectAuthorization authorization) {
         this.projectMemberRepository = projectMemberRepository;
         this.requestRepository = requestRepository;
         this.projectRepository = projectRepository;
@@ -42,129 +35,94 @@ public class ProjectMemberController {
         this.authorization = authorization;
     }
 
-    @PostMapping("/invite")
-    public ResponseEntity<?> inviteMember(
+    @GetMapping
+    public ResponseEntity<List<ProjectMemberResponseDto>> listProjectMembers(
             @PathVariable UUID projectId,
-            @RequestBody ProjectInviteDto dto,
-            Authentication auth
-    ) {
+            JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getName());
+        authorization.requireAtLeast(projectId, userId, ProjectRole.MEMBER);
 
-        UUID actorId = UUID.fromString(auth.getName());
+        var response = projectMemberRepository.findAllByProject_ProjectId(projectId).stream()
+                .map(m -> new ProjectMemberResponseDto(
+                        m.getId(), m.getUser().getUserId(), m.getUser().getUsername(), m.getRole()))
+                .toList();
+        return ResponseEntity.ok(response);
+    }
 
+    @PostMapping("/invite")
+    public ResponseEntity<?> inviteMember(@PathVariable UUID projectId,
+                                          @RequestBody ProjectInviteDto dto,
+                                          JwtAuthenticationToken token) {
+        UUID actorId = UUID.fromString(token.getName());
         authorization.requireAtLeast(projectId, actorId, ProjectRole.MANAGER);
 
-        boolean alreadyMember =
-                projectMemberRepository.existsByProject_ProjectIdAndUser_UserId(
-                        projectId,
-                        dto.userId()
-                );
-
-        if (alreadyMember) {
-            return ResponseEntity
-                    .badRequest()
-                    .body("Usuário já é membro deste projeto");
-        }
-
         if (dto.role() == ProjectRole.OWNER) {
-
-            boolean ownerExists =
-                    projectMemberRepository.existsByProject_ProjectIdAndRole(
-                            projectId,
-                            ProjectRole.OWNER
-                    );
-
-            if (ownerExists) {
-                return ResponseEntity
-                        .badRequest()
-                        .body("Projeto já possui um OWNER");
-            }
+            return ResponseEntity.badRequest().body("Não é possível convidar alguém diretamente como owner");
         }
 
-        var user = userRepository.findById(dto.userId()).orElseThrow();
+        if (projectMemberRepository.existsByProject_ProjectIdAndUser_UserId(projectId, dto.userId())) {
+            return ResponseEntity.badRequest().body("Usuário já é membro deste projeto");
+        }
+
+        var user = userRepository.findById(dto.userId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         var project = projectRepository.findById(projectId).orElseThrow();
 
-        ProjectRequest request = new ProjectRequest(user, project);
-
-        requestRepository.save(request);
-
+        requestRepository.save(new ProjectRequest(user, project, dto.role()));
         return ResponseEntity.ok("Convite enviado");
     }
 
     @PatchMapping("/{memberId}/role")
-    public ResponseEntity<?> updateRole(
-            @PathVariable UUID projectId,
-            @PathVariable UUID memberId,
-            @RequestBody UpdateMemberRoleDto dto,
-            Authentication auth
-    ) {
-
-        UUID userId = UUID.fromString(auth.getName());
-
+    public ResponseEntity<?> updateRole(@PathVariable UUID projectId,
+                                        @PathVariable UUID memberId,
+                                        @RequestBody UpdateMemberRoleDto dto,
+                                        JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getName());
         authorization.requireRole(projectId, userId, ProjectRole.OWNER);
 
-        ProjectMember member = projectMemberRepository
-                .findById(memberId)
-                .orElseThrow();
+        var member = projectMemberRepository.findById(memberId).orElseThrow();
 
         if (dto.role() == ProjectRole.OWNER) {
-
-            boolean ownerExists =
-                    projectMemberRepository.existsByProject_ProjectIdAndRole(
-                            projectId,
-                            ProjectRole.OWNER
-                    );
-
+            boolean ownerExists = projectMemberRepository.existsByProject_ProjectIdAndRole(projectId, ProjectRole.OWNER);
             if (ownerExists && member.getRole() != ProjectRole.OWNER) {
-                return ResponseEntity
-                        .badRequest()
-                        .body("Projeto já possui um OWNER");
+                return ResponseEntity.badRequest().body("Projeto já possui um owner");
             }
         }
 
         member.setRole(dto.role());
-
         projectMemberRepository.save(member);
-
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/{memberId}")
-    public ResponseEntity<Void> removeMember(
-            @PathVariable UUID projectId,
-            @PathVariable UUID memberId,
-            Authentication auth
-    ) {
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> leaveProject(@PathVariable UUID projectId,
+                                             JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getName());
+        var membership = authorization.getMembership(projectId, userId);
 
-        UUID userId = UUID.fromString(auth.getName());
+        if (membership.getRole() == ProjectRole.OWNER) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
-        authorization.requireAtLeast(projectId, userId, ProjectRole.MANAGER);
-
-        projectMemberRepository.deleteById(memberId);
-
+        projectMemberRepository.deleteById(membership.getId());
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping
-    public ResponseEntity<List<ProjectMemberResponseDto>> listProjectMembers(
-            @PathVariable UUID projectId,
-            Authentication auth
-    ) {
+    @DeleteMapping("/{memberId}")
+    public ResponseEntity<Void> removeMember(@PathVariable UUID projectId,
+                                             @PathVariable UUID memberId,
+                                             JwtAuthenticationToken token) {
+        UUID userId = UUID.fromString(token.getName());
+        var actor  = authorization.getMembership(projectId, userId);
+        var target = projectMemberRepository.findById(memberId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        UUID userId = UUID.fromString(auth.getName());
+        boolean actorOutranksTarget = actor.getRole().ordinal() < target.getRole().ordinal();
+        if (!actorOutranksTarget) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
-        authorization.requireAtLeast(projectId, userId, ProjectRole.MANAGER);
-
-        var members = projectMemberRepository
-                .findAllByProject_ProjectId(projectId);
-
-        var response = members.stream()
-                .map(member -> new ProjectMemberResponseDto(
-                        member.getId(),
-                        member.getUser().getUserId(),
-                        member.getRole()
-                ))
-                .toList();
-
-        return ResponseEntity.ok(response);
+        projectMemberRepository.deleteById(memberId);
+        return ResponseEntity.noContent().build();
     }
 }

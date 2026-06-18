@@ -2,12 +2,13 @@ package com.example.demo.model;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
-import jakarta.persistence.Id;
-import java.time.Instant;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "tb_post")
+@Table(name = "tb_posts")
 public class Post {
 
     @Id
@@ -19,40 +20,33 @@ public class Post {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @ManyToOne
+    @JoinColumn(name = "project_id", nullable = false)
+    private Project project;
+
     private String content;
 
     @CreationTimestamp
-    private Instant creationTimeStamp;
+    private Instant creationTimestamp;
 
-    public Long getPostId() {
-        return postId;
-    }
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("creationTimestamp ASC")
+    private List<Comment> comments = new ArrayList<>();
 
-    public void setPostId(Long postId) {
-        this.postId = postId;
-    }
+    public Long getPostId() { return postId; }
+    public void setPostId(Long postId) { this.postId = postId; }
 
-    public User getUser() {
-        return user;
-    }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-    public void setUser(User user) {
-        this.user = user;
-    }
+    public Project getProject() { return project; }
+    public void setProject(Project project) { this.project = project; }
 
-    public String getContent() {
-        return content;
-    }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
 
-    public void setContent(String content) {
-        this.content = content;
-    }
+    public Instant getCreationTimestamp() { return creationTimestamp; }
+    public void setCreationTimestamp(Instant creationTimestamp) { this.creationTimestamp = creationTimestamp; }
 
-    public Instant getCreationTimeStamp() {
-        return creationTimeStamp;
-    }
-
-    public void setCreationTimeStamp(Instant creationTimeStamp) {
-        this.creationTimeStamp = creationTimeStamp;
-    }
+    public List<Comment> getComments() { return comments; }
 }
