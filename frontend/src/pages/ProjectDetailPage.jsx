@@ -339,6 +339,13 @@ export default function ProjectDetailPage() {
                   )}
                 </button>
               ))}
+              <button className="proj-tab chat-tab" onClick={() => nav(`/projetos/${id}/mensagens`)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="9" cy="12" r="1"/><circle cx="14" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>
+                  <path d="M20.5 19.5 22 22l-3.5-1a10 10 0 1 1 2-1.5Z"/>
+                </svg>
+                Mensagens
+              </button>
               <button className="proj-tab chat-tab" onClick={() => nav(`/projetos/${id}/chat`)}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -438,6 +445,14 @@ export default function ProjectDetailPage() {
                         <p className="text-xs text-muted">{m.userId}</p>
                       </div>
                       <RoleBadge role={m.role} />
+                      {isAtLeast('MEMBER') && m.userId !== user?.id && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => nav(`/projetos/${id}/mensagens/${m.userId}`)}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          </svg>
+                          Mensagem
+                        </button>
+                      )}
                       {myRole === 'OWNER' && m.role !== 'OWNER' && (
                         <div className="flex gap-8">
                           <button className="btn btn-ghost btn-sm" onClick={() => setRoleModal({ ...m, newRole: m.role })}>Cargo</button>

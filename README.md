@@ -33,8 +33,8 @@ O Hibernate recria as tabelas automaticamente a cada inicialização (`ddl-auto=
 > ```sql
 > USE demo_db;
 > SET FOREIGN_KEY_CHECKS = 0;
-> DROP TABLE IF EXISTS chat_messages, tb_chat_messages, tb_comments, tb_posts,
->   tb_posts_seq, tb_project_members, tb_project_requests,
+> DROP TABLE IF EXISTS tb_post, tb_comment, chat_messages, tb_chat_messages, tb_comments,
+>   tb_posts, tb_posts_seq, tb_project_members, tb_project_requests,
 >   tb_projects, tb_roles, tb_users_roles, tb_users;
 > SET FOREIGN_KEY_CHECKS = 1;
 > ```
@@ -61,6 +61,20 @@ O Vite faz proxy automático de todas as chamadas de API para `:8080` — não �
 
 ---
 
+## Dados de exemplo
+
+Ao subir o backend, uma seed automática (`SampleProjectDataConfig`) popula o banco com 5 usuários e 10 projetos variados — só pra já ter conteúdo pra navegar, buscar e filtrar em `/projetos` sem precisar cadastrar nada manualmente. Ela roda uma vez (não duplica se já houver projetos) e é independente do usuário `admin` (criado por `AdminUserConfig`).
+
+| Usuário | Senha |
+|---|---|
+| `ana.silva` | `123` |
+| `bruno.costa` | `123` |
+| `carla.souza` | `123` |
+| `diego.santos` | `123` |
+| `elisa.melo` | `123` |
+
+Cada um é dono de 2 projetos (App de Delivery, Sistema de Gestão Escolar, E-commerce, API de Pagamentos, Rede Social, Dashboard, FitTrack, ChatFlow, EduPlay, FreelaHub — nomes e descrições em `SampleProjectDataConfig.java`), cada projeto com o dono como único membro. Dá pra logar com qualquer um deles pra testar a busca, entrar em projeto de outro usuário, chat em tempo real, etc.
+
 ## Funcionalidades
 
 ### Autenticação
@@ -74,7 +88,7 @@ O Vite faz proxy automático de todas as chamadas de API para `:8080` — não �
 - Buscar projeto por ID (`GET /projects/{id}`)
 
 ### Membros
-- Listar membros do projeto
+- Listar membros do projeto — qualquer usuário autenticado (não precisa ser membro; serve pra decidir se quer pedir entrada)
 - Convidar membro por busca de username (`GET /users/search?username=...`)
 - Alterar papel de membro (OWNER)
 - Remover membro (MANAGER+)
@@ -97,7 +111,7 @@ O Vite faz proxy automático de todas as chamadas de API para `:8080` — não �
 - Deletar comentários (autor ou MANAGER+)
 
 ### Chat
-- Chat em tempo real por projeto (MEMBER+) — polling a cada 4 segundos
+- Chat em tempo real por projeto (MEMBER+) — via WebSocket (STOMP), endpoint `/ws`
 - Editar mensagens próprias
 - Deletar mensagens (autor ou MANAGER+)
 
@@ -179,6 +193,12 @@ O Vite faz proxy automático de todas as chamadas de API para `:8080` — não �
 | `POST` | `/projects/{id}/chat` | Enviar mensagem |
 | `PUT` | `/projects/{id}/chat/{mid}` | Editar mensagem (autor) |
 | `DELETE` | `/projects/{id}/chat/{mid}` | Deletar mensagem (autor ou MANAGER+) |
+
+Além do REST acima (usado para histórico e escrita), há um endpoint WebSocket para entrega em tempo real:
+
+| Protocolo | Rota | Descrição |
+|---|---|---|
+| `WS` (STOMP) | `/ws?token={jwt}` | Handshake; inscreva-se em `/topic/projects/{id}/chat` (MEMBER+) para receber `CREATED`/`UPDATED`/`DELETED` em tempo real |
 
 ---
 

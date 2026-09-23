@@ -11,6 +11,7 @@ export default defineConfig({
       '/users':    'http://localhost:8080',
       '/requests': 'http://localhost:8080',
       '/invites':  'http://localhost:8080',
+      '/ws': { target: 'ws://localhost:8080', ws: true },
     }
   }
 })

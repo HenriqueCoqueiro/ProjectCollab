@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getChatMessages, sendChatMessage, editChatMessage, deleteChatMessage, listProjects } from '../api/client'
+import { connectChatSocket, disconnectChatSocket } from '../api/ws'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { Navbar, PageLoader, Avatar, Confirm } from '../components'
@@ -42,11 +43,35 @@ export default function ChatPage() {
     }
   }
 
+  // Aplica eventos recebidos em tempo real via WebSocket. O CREATED usa
+  // dedupe por messageId porque o próprio remetente já insere a mensagem
+  // otimisticamente em submit() — assim a mensagem não aparece duplicada
+  // quando o eco do servidor chega pelo socket.
+  const handleChatEvent = event => {
+    if (event.type === 'CREATED') {
+      setMessages(prev =>
+        prev.some(m => m.messageId === event.message.messageId)
+          ? prev
+          : [...prev, event.message])
+    } else if (event.type === 'UPDATED') {
+      setMessages(prev => prev.map(m => m.messageId === event.message.messageId ? event.message : m))
+    } else if (event.type === 'DELETED') {
+      setMessages(prev => prev.filter(m => m.messageId !== event.messageId))
+    }
+  }
+
   useEffect(() => {
     if (!project) return
     loadMessages()
-    const interval = setInterval(() => loadMessages(true), 4000)
-    return () => clearInterval(interval)
+
+    // Conecta ao chat em tempo real; ao (re)conectar, ressincroniza o
+    // histórico via REST (cobre qualquer mensagem perdida enquanto offline).
+    const socket = connectChatSocket(id, {
+      onConnect: () => loadMessages(true),
+      onEvent: handleChatEvent,
+    })
+
+    return () => disconnectChatSocket(socket)
   }, [project])
 
   useEffect(() => {
@@ -59,7 +84,13 @@ export default function ChatPage() {
     setSending(true)
     try {
       const res = await sendChatMessage(id, { content: text.trim() })
-      setMessages(p => [...p, res.data])
+      // O evento CREATED do WebSocket pode chegar antes desta resposta REST
+      // (o backend publica no tópico antes de devolver o HTTP 201); dedupe
+      // por messageId evita inserir a própria mensagem duas vezes.
+      setMessages(p =>
+        p.some(m => m.messageId === res.data.messageId)
+          ? p
+          : [...p, res.data])
       setText('')
       inputRef.current?.focus()
     } catch { toast('Erro ao enviar mensagem', 'error') }

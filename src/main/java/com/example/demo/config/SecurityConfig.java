@@ -40,6 +40,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
+                        // O handshake do WebSocket nao envia header Authorization (limitacao
+                        // do WebSocket nativo do navegador); a autenticacao e feita manualmente
+                        // via token na query string, em JwtHandshakeInterceptor.
+                        .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated())
                 .csrf(csrf -> csrf.disable())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))

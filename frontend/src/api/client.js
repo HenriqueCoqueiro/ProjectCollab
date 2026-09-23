@@ -64,10 +64,17 @@ export const listComments  = (pid, postId)        => api.get(`/projects/${pid}/p
 export const createComment = (pid, postId, d)     => api.post(`/projects/${pid}/post/${postId}/comments`, d)
 export const deleteComment = (pid, postId, cid)   => api.delete(`/projects/${pid}/post/${postId}/comments/${cid}`)
 
-// Chat
+// Chat (grupo do projeto)
 export const getChatMessages = (pid)           => api.get(`/projects/${pid}/chat`)
 export const sendChatMessage  = (pid, d)        => api.post(`/projects/${pid}/chat`, d)
 export const editChatMessage  = (pid, mid, d)   => api.put(`/projects/${pid}/chat/${mid}`, d)
 export const deleteChatMessage = (pid, mid)     => api.delete(`/projects/${pid}/chat/${mid}`)
+
+// Mensagens diretas (chat 1-para-1 entre dois membros do mesmo projeto)
+export const listConversations    = pid                        => api.get(`/projects/${pid}/dm`)
+export const getDirectMessages    = (pid, otherUserId)          => api.get(`/projects/${pid}/dm/${otherUserId}`)
+export const sendDirectMessage    = (pid, otherUserId, d)       => api.post(`/projects/${pid}/dm/${otherUserId}`, d)
+export const editDirectMessage    = (pid, otherUserId, mid, d)  => api.put(`/projects/${pid}/dm/${otherUserId}/${mid}`, d)
+export const deleteDirectMessage  = (pid, otherUserId, mid)     => api.delete(`/projects/${pid}/dm/${otherUserId}/${mid}`)
 
 export default api

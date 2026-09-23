@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.config.ProjectAuthorization;
+import com.example.demo.controller.dto.ChatEventDto;
 import com.example.demo.controller.dto.ChatMessageResponseDto;
 import com.example.demo.controller.dto.CreateChatMessageDto;
 import com.example.demo.model.ChatMessage;
@@ -10,6 +11,7 @@ import com.example.demo.repository.ProjectRepository;
 import com.example.demo.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,15 +27,22 @@ public class ChatController {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ProjectAuthorization authorization;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public ChatController(ChatMessageRepository chatRepository,
                           ProjectRepository projectRepository,
                           UserRepository userRepository,
-                          ProjectAuthorization authorization) {
+                          ProjectAuthorization authorization,
+                          SimpMessagingTemplate messagingTemplate) {
         this.chatRepository = chatRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.authorization = authorization;
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    private void broadcast(UUID projectId, ChatEventDto event) {
+        messagingTemplate.convertAndSend("/topic/projects/" + projectId + "/chat", event);
     }
 
     @GetMapping
@@ -77,12 +86,15 @@ public class ChatController {
 
         var saved = chatRepository.save(message);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ChatMessageResponseDto(
-                        saved.getMessageId(),
-                        saved.getSender().getUsername(),
-                        saved.getContent(),
-                        saved.getCreationTimestamp()));
+        var responseDto = new ChatMessageResponseDto(
+                saved.getMessageId(),
+                saved.getSender().getUsername(),
+                saved.getContent(),
+                saved.getCreationTimestamp());
+
+        broadcast(projectId, ChatEventDto.created(responseDto));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
     }
 
     @PutMapping("/{messageId}")
@@ -103,7 +115,16 @@ public class ChatController {
         }
 
         message.setContent(dto.content());
-        chatRepository.save(message);
+        var saved = chatRepository.save(message);
+
+        var responseDto = new ChatMessageResponseDto(
+                saved.getMessageId(),
+                saved.getSender().getUsername(),
+                saved.getContent(),
+                saved.getCreationTimestamp());
+
+        broadcast(projectId, ChatEventDto.updated(responseDto));
+
         return ResponseEntity.ok().build();
     }
 
@@ -128,6 +149,9 @@ public class ChatController {
         }
 
         chatRepository.deleteById(messageId);
+
+        broadcast(projectId, ChatEventDto.deleted(messageId));
+
         return ResponseEntity.noContent().build();
     }
 }

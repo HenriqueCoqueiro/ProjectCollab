@@ -39,9 +39,13 @@ public class ProjectMemberController {
     public ResponseEntity<List<ProjectMemberResponseDto>> listProjectMembers(
             @PathVariable UUID projectId,
             JwtAuthenticationToken token) {
-        UUID userId = UUID.fromString(token.getName());
-        authorization.requireAtLeast(projectId, userId, ProjectRole.MEMBER);
-
+        // Lista de membros é leitura pública para qualquer usuário autenticado
+        // (não exige ser membro do projeto) — mesma exposição que já existe em
+        // GET /projects e GET /projects/{id}, que mostram nome, descrição e
+        // ownerId do projeto para qualquer um. Sem essa leitura, quem ainda
+        // não é membro nem consegue ver quem é o dono antes de pedir entrada.
+        // Ações de escrita (convidar, alterar cargo, remover) continuam
+        // exigindo MANAGER/OWNER normalmente, como já era.
         var response = projectMemberRepository.findAllByProject_ProjectId(projectId).stream()
                 .map(m -> new ProjectMemberResponseDto(
                         m.getId(), m.getUser().getUserId(), m.getUser().getUsername(), m.getRole()))
