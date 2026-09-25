@@ -1,5 +1,7 @@
 # Colabora
 
+Criado por: Henrique Coqueiro de Melo e Karlos Danyel Veloso dos Reis
+
 Plataforma de colaboração em projetos — backend Spring Boot + frontend React.
 
 ```
